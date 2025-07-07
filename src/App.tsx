@@ -4,6 +4,7 @@ import { Shield, Lock, Key, Server, Database, Eye, AlertTriangle, Clock, Chevron
 import { supabase } from './supabase';
 import AuthModal from './components/AuthModal';
 import Folder from './components/folder';
+import FileManager from './components/FileManager';
 
 function LandingPage() {
   const [user, setUser] = useState<any>(null);
@@ -363,6 +364,7 @@ function App() {
     <Routes>
       <Route path="/" element={<LandingPage />} />
       <Route path="/folder" element={<Folder />} />
+      <Route path="/folder/:folderId" element={<FileManager />} />
     </Routes>
   );
 }

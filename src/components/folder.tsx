@@ -370,7 +370,10 @@ export default function Folder() {
                       <div className="text-sm text-green-400 mb-2">
                         ✓ Folder unlocked and ready to use
                       </div>
-                      <button className="w-full bg-green-600/20 hover:bg-green-600/30 text-green-400 py-2 px-4 rounded-lg transition-colors">
+                      <button
+                        onClick={() => navigate(`/folder/${folder.id}`)}
+                        className="w-full bg-green-600/20 hover:bg-green-600/30 text-green-400 py-2 px-4 rounded-lg transition-colors"
+                      >
                         Manage Files
                       </button>
                     </div>

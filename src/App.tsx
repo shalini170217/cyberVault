@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
+import { Routes, Route, useNavigate } from 'react-router-dom';
 import { Shield, Lock, Key, Server, Database, Eye, AlertTriangle, Clock, ChevronRight, Github, Twitter, Linkedin, LogOut, User } from 'lucide-react';
 import { supabase } from './supabase';
 import AuthModal from './components/AuthModal';
+import Folder from './components/folder';
 
-function App() {
+function LandingPage() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
+  const navigate = useNavigate();
 
   useEffect(() => {
     // Get initial session
@@ -32,6 +35,14 @@ function App() {
   const openAuthModal = (mode: 'login' | 'signup') => {
     setAuthMode(mode);
     setAuthModalOpen(true);
+  };
+
+  const handleAccessVault = () => {
+    if (user) {
+      navigate('/folder');
+    } else {
+      openAuthModal('login');
+    }
   };
 
   if (loading) {
@@ -124,31 +135,21 @@ function App() {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
-              {user ? (
-                <button className="group relative overflow-hidden bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 px-8 py-4 rounded-lg font-semibold text-lg transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-cyan-500/25">
-                  <span className="relative z-10 flex items-center">
-                    Access Vault
-                    <ChevronRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
-                  </span>
-                  <div className="absolute inset-0 bg-gradient-to-r from-cyan-400 to-blue-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              <button
+                onClick={handleAccessVault}
+                className="group relative overflow-hidden bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 px-8 py-4 rounded-lg font-semibold text-lg transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-cyan-500/25"
+              >
+                <span className="relative z-10 flex items-center">
+                  {user ? 'Access Vault' : 'Get Started'}
+                  <ChevronRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                </span>
+                <div className="absolute inset-0 bg-gradient-to-r from-cyan-400 to-blue-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              </button>
+              
+              {!user && (
+                <button className="px-8 py-4 rounded-lg font-semibold text-lg border border-gray-600 hover:border-cyan-400 hover:bg-gray-800/50 transition-all duration-300">
+                  Learn More
                 </button>
-              ) : (
-                <>
-                  <button
-                    onClick={() => openAuthModal('signup')}
-                    className="group relative overflow-hidden bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 px-8 py-4 rounded-lg font-semibold text-lg transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-cyan-500/25"
-                  >
-                    <span className="relative z-10 flex items-center">
-                      Get Started
-                      <ChevronRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
-                    </span>
-                    <div className="absolute inset-0 bg-gradient-to-r from-cyan-400 to-blue-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                  </button>
-                  
-                  <button className="px-8 py-4 rounded-lg font-semibold text-lg border border-gray-600 hover:border-cyan-400 hover:bg-gray-800/50 transition-all duration-300">
-                    Learn More
-                  </button>
-                </>
               )}
             </div>
 
@@ -354,6 +355,15 @@ function App() {
         onModeChange={setAuthMode}
       />
     </div>
+  );
+}
+
+function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/folder" element={<Folder />} />
+    </Routes>
   );
 }
 

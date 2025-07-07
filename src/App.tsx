@@ -1,11 +1,54 @@
-import React from 'react';
-import { Shield, Lock, Key, Server, Database, Eye, AlertTriangle, Clock, ChevronRight, Github, Twitter, Linkedin } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Shield, Lock, Key, Server, Database, Eye, AlertTriangle, Clock, ChevronRight, Github, Twitter, Linkedin, LogOut, User } from 'lucide-react';
+import { supabase } from './supabase';
+import AuthModal from './components/AuthModal';
 
 function App() {
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
+
+  useEffect(() => {
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+  };
+
+  const openAuthModal = (mode: 'login' | 'signup') => {
+    setAuthMode(mode);
+    setAuthModalOpen(true);
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-400 mx-auto mb-4"></div>
+          <p className="text-gray-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 text-white">
       {/* Header */}
-      <header className="fixed top-0 w-full bg-black/20 backdrop-blur-sm border-b border-gray-800/50 z-50">
+      <header className="fixed top-0 w-full bg-black/20 backdrop-blur-sm border-b border-gray-800/50 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-2">
@@ -14,11 +57,45 @@ function App() {
                 CyberVault
               </span>
             </div>
-            <nav className="hidden md:flex space-x-8">
-              <a href="#features" className="text-gray-300 hover:text-cyan-400 transition-colors">Features</a>
-              <a href="#security" className="text-gray-300 hover:text-cyan-400 transition-colors">Security</a>
-              <a href="#contact" className="text-gray-300 hover:text-cyan-400 transition-colors">Contact</a>
-            </nav>
+            
+            <div className="flex items-center space-x-4">
+              <nav className="hidden md:flex space-x-8">
+                <a href="#features" className="text-gray-300 hover:text-cyan-400 transition-colors">Features</a>
+                <a href="#security" className="text-gray-300 hover:text-cyan-400 transition-colors">Security</a>
+                <a href="#contact" className="text-gray-300 hover:text-cyan-400 transition-colors">Contact</a>
+              </nav>
+              
+              {user ? (
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-2 text-gray-300">
+                    <User className="h-5 w-5" />
+                    <span className="text-sm">{user.email}</span>
+                  </div>
+                  <button
+                    onClick={handleSignOut}
+                    className="flex items-center space-x-2 px-4 py-2 bg-gray-800/50 hover:bg-gray-700/50 rounded-lg transition-colors"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    <span>Sign Out</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={() => openAuthModal('login')}
+                    className="px-4 py-2 text-gray-300 hover:text-cyan-400 transition-colors"
+                  >
+                    Sign In
+                  </button>
+                  <button
+                    onClick={() => openAuthModal('signup')}
+                    className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 rounded-lg font-medium transition-all duration-300"
+                  >
+                    Sign Up
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </header>
@@ -47,17 +124,32 @@ function App() {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
-              <button className="group relative overflow-hidden bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 px-8 py-4 rounded-lg font-semibold text-lg transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-cyan-500/25">
-                <span className="relative z-10 flex items-center">
-                  Get Started
-                  <ChevronRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
-                </span>
-                <div className="absolute inset-0 bg-gradient-to-r from-cyan-400 to-blue-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-              </button>
-              
-              <button className="px-8 py-4 rounded-lg font-semibold text-lg border border-gray-600 hover:border-cyan-400 hover:bg-gray-800/50 transition-all duration-300">
-                Learn More
-              </button>
+              {user ? (
+                <button className="group relative overflow-hidden bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 px-8 py-4 rounded-lg font-semibold text-lg transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-cyan-500/25">
+                  <span className="relative z-10 flex items-center">
+                    Access Vault
+                    <ChevronRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                  </span>
+                  <div className="absolute inset-0 bg-gradient-to-r from-cyan-400 to-blue-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={() => openAuthModal('signup')}
+                    className="group relative overflow-hidden bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 px-8 py-4 rounded-lg font-semibold text-lg transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-cyan-500/25"
+                  >
+                    <span className="relative z-10 flex items-center">
+                      Get Started
+                      <ChevronRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                    </span>
+                    <div className="absolute inset-0 bg-gradient-to-r from-cyan-400 to-blue-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                  </button>
+                  
+                  <button className="px-8 py-4 rounded-lg font-semibold text-lg border border-gray-600 hover:border-cyan-400 hover:bg-gray-800/50 transition-all duration-300">
+                    Learn More
+                  </button>
+                </>
+              )}
             </div>
 
             {/* Trust Indicators */}
@@ -209,13 +301,18 @@ function App() {
           <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
             Join thousands of users who trust CyberVault with their most sensitive data. Your security is our mission.
           </p>
-          <button className="group relative overflow-hidden bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 px-12 py-6 rounded-xl font-semibold text-xl transition-all duration-300 transform hover:scale-105 hover:shadow-2xl hover:shadow-cyan-500/25">
-            <span className="relative z-10 flex items-center">
-              Get Started Now
-              <ChevronRight className="ml-3 h-6 w-6 group-hover:translate-x-1 transition-transform" />
-            </span>
-            <div className="absolute inset-0 bg-gradient-to-r from-cyan-400 to-blue-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-          </button>
+          {!user && (
+            <button
+              onClick={() => openAuthModal('signup')}
+              className="group relative overflow-hidden bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 px-12 py-6 rounded-xl font-semibold text-xl transition-all duration-300 transform hover:scale-105 hover:shadow-2xl hover:shadow-cyan-500/25"
+            >
+              <span className="relative z-10 flex items-center">
+                Get Started Now
+                <ChevronRight className="ml-3 h-6 w-6 group-hover:translate-x-1 transition-transform" />
+              </span>
+              <div className="absolute inset-0 bg-gradient-to-r from-cyan-400 to-blue-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            </button>
+          )}
         </div>
       </section>
 
@@ -248,6 +345,14 @@ function App() {
           </div>
         </div>
       </footer>
+
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        mode={authMode}
+        onModeChange={setAuthMode}
+      />
     </div>
   );
 }

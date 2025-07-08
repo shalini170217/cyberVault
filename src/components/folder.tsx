@@ -446,10 +446,6 @@ Keep your encryption keys safe and separate from this backup!
                       <Package className="h-4 w-4" />
                       <span>Backup All Folders</span>
                     </button>
-                    <button className="w-full text-left px-3 py-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors flex items-center space-x-2">
-                      <Bomb className="h-4 w-4" />
-                      <span>Wipe All Data</span>
-                    </button>
                   </div>
                 </div>
               )}
@@ -599,6 +595,21 @@ Keep your encryption keys safe and separate from this backup!
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
+                    </div>
+                  )}
+
+                  {!folder.isUnlocked && !isBlocked && (
+                    <div className="mt-2">
+                      <button
+                        onClick={() => {
+                          setSelectedFolderForDelete(folder);
+                          setShowDeleteModal(true);
+                        }}
+                        className="w-full bg-red-600/10 hover:bg-red-600/20 text-red-400 py-2 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2 text-sm"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        <span>Delete Folder</span>
+                      </button>
                     </div>
                   )}
 

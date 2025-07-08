@@ -6,6 +6,166 @@ import AuthModal from './components/AuthModal';
 import Folder from './components/folder';
 import FileManager from './components/FileManager';
 
+// Animated Background Components
+function AnimatedStars() {
+  const [stars, setStars] = useState<Array<{id: number, x: number, delay: number, duration: number}>>([]);
+
+  useEffect(() => {
+    const starArray = Array.from({ length: 50 }, (_, i) => ({
+      id: i,
+      x: Math.random() * 100,
+      delay: Math.random() * 5,
+      duration: 3 + Math.random() * 4
+    }));
+    setStars(starArray);
+  }, []);
+
+  return (
+    <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+      {stars.map((star) => (
+        <div
+          key={star.id}
+          className="absolute w-1 h-1 bg-cyan-400 rounded-full opacity-70 animate-pulse"
+          style={{
+            left: `${star.x}%`,
+            animationDelay: `${star.delay}s`,
+            animation: `fallingStar ${star.duration}s linear infinite`
+          }}
+        />
+      ))}
+      <style jsx>{`
+        @keyframes fallingStar {
+          0% {
+            transform: translateY(-100vh) translateX(0);
+            opacity: 0;
+          }
+          10% {
+            opacity: 1;
+          }
+          90% {
+            opacity: 1;
+          }
+          100% {
+            transform: translateY(100vh) translateX(-50px);
+            opacity: 0;
+          }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+function AnimatedRockets() {
+  const [rockets, setRockets] = useState<Array<{id: number, y: number, delay: number, duration: number}>>([]);
+
+  useEffect(() => {
+    const rocketArray = Array.from({ length: 3 }, (_, i) => ({
+      id: i,
+      y: 20 + Math.random() * 60,
+      delay: Math.random() * 8,
+      duration: 8 + Math.random() * 4
+    }));
+    setRockets(rocketArray);
+  }, []);
+
+  return (
+    <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+      {rockets.map((rocket) => (
+        <div
+          key={rocket.id}
+          className="absolute text-cyan-400 opacity-30"
+          style={{
+            top: `${rocket.y}%`,
+            animationDelay: `${rocket.delay}s`,
+            animation: `floatingRocket ${rocket.duration}s ease-in-out infinite`
+          }}
+        >
+          <div className="relative">
+            <div className="w-8 h-8 bg-gradient-to-r from-cyan-400 to-blue-500 rounded-full flex items-center justify-center">
+              🚀
+            </div>
+            <div className="absolute -right-2 top-1/2 transform -translate-y-1/2 w-6 h-1 bg-gradient-to-r from-orange-400 to-transparent rounded-full opacity-60"></div>
+          </div>
+        </div>
+      ))}
+      <style jsx>{`
+        @keyframes floatingRocket {
+          0% {
+            transform: translateX(-100px) translateY(0) rotate(-10deg);
+          }
+          25% {
+            transform: translateX(25vw) translateY(-20px) rotate(5deg);
+          }
+          50% {
+            transform: translateX(50vw) translateY(10px) rotate(-5deg);
+          }
+          75% {
+            transform: translateX(75vw) translateY(-15px) rotate(10deg);
+          }
+          100% {
+            transform: translateX(calc(100vw + 100px)) translateY(5px) rotate(-10deg);
+          }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+function FloatingParticles() {
+  const [particles, setParticles] = useState<Array<{id: number, x: number, y: number, delay: number, duration: number, size: number}>>([]);
+
+  useEffect(() => {
+    const particleArray = Array.from({ length: 30 }, (_, i) => ({
+      id: i,
+      x: Math.random() * 100,
+      y: Math.random() * 100,
+      delay: Math.random() * 10,
+      duration: 10 + Math.random() * 10,
+      size: 2 + Math.random() * 4
+    }));
+    setParticles(particleArray);
+  }, []);
+
+  return (
+    <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+      {particles.map((particle) => (
+        <div
+          key={particle.id}
+          className="absolute bg-gradient-to-r from-cyan-400/20 to-blue-500/20 rounded-full"
+          style={{
+            left: `${particle.x}%`,
+            top: `${particle.y}%`,
+            width: `${particle.size}px`,
+            height: `${particle.size}px`,
+            animationDelay: `${particle.delay}s`,
+            animation: `floatingParticle ${particle.duration}s ease-in-out infinite`
+          }}
+        />
+      ))}
+      <style jsx>{`
+        @keyframes floatingParticle {
+          0%, 100% {
+            transform: translateY(0) translateX(0) scale(1);
+            opacity: 0.3;
+          }
+          25% {
+            transform: translateY(-20px) translateX(10px) scale(1.2);
+            opacity: 0.6;
+          }
+          50% {
+            transform: translateY(-10px) translateX(-15px) scale(0.8);
+            opacity: 0.4;
+          }
+          75% {
+            transform: translateY(-30px) translateX(5px) scale(1.1);
+            opacity: 0.7;
+          }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 function LandingPage() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -59,8 +219,13 @@ function LandingPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 text-white">
+      {/* Animated Background Elements */}
+      <AnimatedStars />
+      <AnimatedRockets />
+      <FloatingParticles />
+      
       {/* Header */}
-      <header className="fixed top-0 w-full bg-black/20 backdrop-blur-sm border-b border-gray-800/50 z-40">
+      <header className="fixed top-0 w-full bg-black/20 backdrop-blur-sm border-b border-gray-800/50 z-40 relative">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-2">
@@ -113,7 +278,7 @@ function LandingPage() {
       </header>
 
       {/* Hero Section */}
-      <section className="pt-32 pb-20 px-4 sm:px-6 lg:px-8">
+      <section className="pt-32 pb-20 px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="max-w-7xl mx-auto">
           <div className="text-center">
             <div className="flex justify-center mb-8">
@@ -174,7 +339,7 @@ function LandingPage() {
       </section>
 
       {/* Features Section */}
-      <section id="features" className="py-20 px-4 sm:px-6 lg:px-8 bg-gray-900/50">
+      <section id="features" className="py-20 px-4 sm:px-6 lg:px-8 bg-gray-900/50 relative z-10">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
@@ -229,7 +394,7 @@ function LandingPage() {
       </section>
 
       {/* Security Features */}
-      <section id="security" className="py-20 px-4 sm:px-6 lg:px-8">
+      <section id="security" className="py-20 px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="max-w-7xl mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
             <div>
@@ -295,7 +460,7 @@ function LandingPage() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-r from-cyan-900/20 to-blue-900/20">
+      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-r from-cyan-900/20 to-blue-900/20 relative z-10">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-white to-cyan-400 bg-clip-text text-transparent">
             Ready to Secure Your Digital Life?
@@ -319,7 +484,7 @@ function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer id="contact" className="py-12 px-4 sm:px-6 lg:px-8 bg-black/50 border-t border-gray-800/50">
+      <footer id="contact" className="py-12 px-4 sm:px-6 lg:px-8 bg-black/50 border-t border-gray-800/50 relative z-10">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="flex items-center space-x-2 mb-4 md:mb-0">

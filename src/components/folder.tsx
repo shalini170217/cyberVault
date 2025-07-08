@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, ArrowLeft, Plus, Folder as FolderIcon, Lock, Key, Eye, EyeOff, AlertTriangle, Check, Copy, Download, Upload } from 'lucide-react';
+import { Shield, ArrowLeft, Plus, Folder as FolderIcon, Lock, Key, Eye, EyeOff, AlertTriangle, Check, Copy, Download, Upload, Bomb, Package, Trash2, Archive } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase';
 import CryptoJS from 'crypto-js';
+import JSZip from 'jszip';
 
 interface FolderData {
   id: string;
@@ -32,6 +33,14 @@ export default function Folder() {
   const [success, setSuccess] = useState('');
   const [keyAttempts, setKeyAttempts] = useState<{[key: string]: number}>({});
   const [blockedFolders, setBlockedFolders] = useState<{[key: string]: number}>({});
+  const [showGlobalActions, setShowGlobalActions] = useState(false);
+  const [showBackupAllModal, setShowBackupAllModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [selectedFolderForDelete, setSelectedFolderForDelete] = useState<DecryptedFolder | null>(null);
+  const [backupAuthPassword, setBackupAuthPassword] = useState('');
+  const [deleteKey, setDeleteKey] = useState('');
+  const [backupData, setBackupData] = useState('');
+  const [backupStep, setBackupStep] = useState<'auth' | 'download'>('auth');
 
   useEffect(() => {
     checkUser();
@@ -172,6 +181,162 @@ export default function Folder() {
     }
   };
 
+  const handleBackupAll = async () => {
+    if (!backupAuthPassword.trim()) {
+      setError('Please enter your account password');
+      return;
+    }
+
+    try {
+      // Verify user password
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: backupAuthPassword,
+      });
+
+      if (authError) {
+        setError('Invalid password. Please try again.');
+        return;
+      }
+
+      // Create backup data
+      const backupObject = {
+        version: '1.0',
+        created: new Date().toISOString(),
+        user_id: user.id,
+        folders: folders.map(folder => ({
+          id: folder.id,
+          folder_name: folder.folder_name,
+          encrypted_content: folder.encrypted_content,
+          created_at: folder.created_at
+        })),
+        metadata: {
+          total_folders: folders.length,
+          backup_type: 'full_vault_backup'
+        }
+      };
+
+      const backupJson = JSON.stringify(backupObject, null, 2);
+      setBackupData(backupJson);
+
+      setBackupStep('download');
+      setError('');
+      setSuccess('Backup created successfully!');
+    } catch (error: any) {
+      setError('Failed to create backup: ' + error.message);
+    }
+  };
+
+  const downloadBackupZip = async () => {
+    try {
+      const zip = new JSZip();
+      
+      // Add main backup file
+      zip.file('cybervault-backup.json', backupData);
+      
+      // Add individual folder files for easier access
+      const backupObject = JSON.parse(backupData);
+      backupObject.folders.forEach((folder: any, index: number) => {
+        const folderData = {
+          id: folder.id,
+          folder_name: folder.folder_name,
+          encrypted_content: folder.encrypted_content,
+          created_at: folder.created_at
+        };
+        zip.file(`folders/folder-${index + 1}-${folder.folder_name.replace(/[^a-zA-Z0-9]/g, '_')}.json`, 
+                 JSON.stringify(folderData, null, 2));
+      });
+      
+      // Add README file
+      const readme = `CyberVault Backup
+==================
+
+This backup contains your encrypted CyberVault data.
+
+IMPORTANT SECURITY NOTES:
+- This backup contains ENCRYPTED data only
+- Your encryption keys are NOT included in this backup
+- Store your encryption keys separately and securely
+- Without the encryption keys, this data cannot be decrypted
+
+Files included:
+- cybervault-backup.json: Complete backup data
+- folders/: Individual folder files for easier access
+
+Created: ${new Date().toISOString()}
+Total Folders: ${backupObject.folders.length}
+
+To restore your data, you will need:
+1. This backup file
+2. Your individual folder encryption keys
+3. Access to CyberVault application
+
+Keep your encryption keys safe and separate from this backup!
+`;
+      
+      zip.file('README.txt', readme);
+      
+      // Generate and download ZIP
+      const content = await zip.generateAsync({ type: 'blob' });
+      const element = document.createElement('a');
+      element.href = URL.createObjectURL(content);
+      element.download = `cybervault-backup-${new Date().toISOString().split('T')[0]}.zip`;
+      document.body.appendChild(element);
+      element.click();
+      document.body.removeChild(element);
+      
+      setSuccess('Backup ZIP file downloaded successfully!');
+    } catch (error: any) {
+      setError('Failed to create ZIP file: ' + error.message);
+    }
+  };
+
+  const downloadBackupJson = () => {
+    const element = document.createElement('a');
+    const file = new Blob([backupData], { type: 'application/json' });
+    element.href = URL.createObjectURL(file);
+    element.download = `cybervault-backup-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+    setSuccess('Backup JSON downloaded successfully!');
+  };
+
+  const copyBackupToClipboard = () => {
+    navigator.clipboard.writeText(backupData);
+    setSuccess('Backup data copied to clipboard!');
+  };
+
+  const handleDeleteFolder = async () => {
+    if (!selectedFolderForDelete || !deleteKey.trim()) {
+      setError('Please enter the encryption key');
+      return;
+    }
+
+    try {
+      // Verify the encryption key by trying to decrypt the content
+      if (selectedFolderForDelete.encrypted_content) {
+        decryptContent(selectedFolderForDelete.encrypted_content, deleteKey);
+      }
+
+      // Delete from database
+      const { error } = await supabase
+        .from('folders')
+        .delete()
+        .eq('id', selectedFolderForDelete.id);
+
+      if (error) throw error;
+
+      setSuccess('Folder deleted successfully!');
+      setShowDeleteModal(false);
+      setSelectedFolderForDelete(null);
+      setDeleteKey('');
+      loadFolders();
+    } catch (error: any) {
+      setError('Invalid encryption key or failed to delete folder');
+    }
+  };
+
   const copyKeyToClipboard = () => {
     navigator.clipboard.writeText(generatedKey);
     setSuccess('Encryption key copied to clipboard!');
@@ -199,6 +364,22 @@ export default function Folder() {
     setShowUnlockModal(false);
     setSelectedFolder(null);
     setUnlockKey('');
+    setError('');
+  };
+
+  const closeBackupModal = () => {
+    setShowBackupAllModal(false);
+    setBackupAuthPassword('');
+    setBackupData('');
+    setBackupStep('auth');
+    setError('');
+    setSuccess('');
+  };
+
+  const closeDeleteModal = () => {
+    setShowDeleteModal(false);
+    setSelectedFolderForDelete(null);
+    setDeleteKey('');
     setError('');
   };
 
@@ -242,6 +423,37 @@ export default function Folder() {
               <Plus className="h-5 w-5" />
               <span>New Folder</span>
             </button>
+            
+            <div className="relative">
+              <button
+                onClick={() => setShowGlobalActions(!showGlobalActions)}
+                className="flex items-center space-x-2 bg-gray-700/50 hover:bg-gray-600/50 px-4 py-2 rounded-lg font-medium transition-all duration-300"
+              >
+                <Shield className="h-5 w-5" />
+                <span>Security</span>
+              </button>
+              
+              {showGlobalActions && (
+                <div className="absolute right-0 top-full mt-2 w-48 bg-gray-800/95 border border-gray-700/50 rounded-lg shadow-xl z-10 backdrop-blur-sm">
+                  <div className="p-2">
+                    <button
+                      onClick={() => {
+                        setShowBackupAllModal(true);
+                        setShowGlobalActions(false);
+                      }}
+                      className="w-full text-left px-3 py-2 text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors flex items-center space-x-2"
+                    >
+                      <Package className="h-4 w-4" />
+                      <span>Backup All Folders</span>
+                    </button>
+                    <button className="w-full text-left px-3 py-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors flex items-center space-x-2">
+                      <Bomb className="h-4 w-4" />
+                      <span>Wipe All Data</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </header>
@@ -370,12 +582,23 @@ export default function Folder() {
                       <div className="text-sm text-green-400 mb-2">
                         ✓ Folder unlocked and ready to use
                       </div>
-                      <button
-                        onClick={() => navigate(`/folder/${folder.id}`)}
-                        className="w-full bg-green-600/20 hover:bg-green-600/30 text-green-400 py-2 px-4 rounded-lg transition-colors"
-                      >
-                        Manage Files
-                      </button>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => navigate(`/folder/${folder.id}`)}
+                          className="flex-1 bg-green-600/20 hover:bg-green-600/30 text-green-400 py-2 px-3 rounded-lg transition-colors text-sm"
+                        >
+                          Manage Files
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSelectedFolderForDelete(folder);
+                            setShowDeleteModal(true);
+                          }}
+                          className="bg-red-600/20 hover:bg-red-600/30 text-red-400 py-2 px-3 rounded-lg transition-colors"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
                     </div>
                   )}
 
@@ -549,6 +772,222 @@ export default function Folder() {
                 className="flex-1 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white px-4 py-3 rounded-lg transition-all duration-300"
               >
                 Unlock
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Backup All Folders Modal */}
+      {showBackupAllModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900/95 border border-blue-500/50 rounded-2xl p-8 w-full max-w-2xl backdrop-blur-sm max-h-[90vh] overflow-y-auto">
+            {backupStep === 'auth' ? (
+              <>
+                <div className="text-center mb-6">
+                  <div className="p-3 bg-blue-500/10 rounded-full w-fit mx-auto mb-4">
+                    <Package className="h-8 w-8 text-blue-400" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-white mb-2">Backup All Folders</h2>
+                  <p className="text-gray-400">
+                    Authenticate to create a backup of all your encrypted folders
+                  </p>
+                </div>
+
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 mb-6">
+                  <div className="flex items-start space-x-3">
+                    <Shield className="h-5 w-5 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <div className="text-sm text-blue-400">
+                      <p className="font-medium mb-1">🔒 Security Information:</p>
+                      <ul className="space-y-1 text-xs">
+                        <li>• Backup contains encrypted data only</li>
+                        <li>• Your encryption keys are NOT included</li>
+                        <li>• Data remains secure even if backup is compromised</li>
+                        <li>• Store your encryption keys separately and securely</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Account Password
+                  </label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    <input
+                      type="password"
+                      value={backupAuthPassword}
+                      onChange={(e) => setBackupAuthPassword(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 bg-gray-800/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-colors"
+                      placeholder="Enter your account password"
+                      onKeyPress={(e) => e.key === 'Enter' && handleBackupAll()}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex space-x-3">
+                  <button
+                    onClick={closeBackupModal}
+                    className="flex-1 px-4 py-3 bg-gray-700/50 hover:bg-gray-600/50 text-white rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleBackupAll}
+                    className="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-400 hover:to-blue-500 text-white px-4 py-3 rounded-lg transition-all duration-300"
+                  >
+                    Create Backup
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="text-center mb-6">
+                  <div className="p-3 bg-green-500/10 rounded-full w-fit mx-auto mb-4">
+                    <Check className="h-8 w-8 text-green-400" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-white mb-2">Backup Ready</h2>
+                  <p className="text-gray-400">
+                    Your encrypted vault backup is ready for download
+                  </p>
+                </div>
+
+                {/* Download Options */}
+                <div className="bg-gray-800/30 rounded-lg p-6 mb-6">
+                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
+                    <Download className="h-5 w-5 mr-2 text-green-400" />
+                    Download Options
+                  </h3>
+                  <div className="space-y-3">
+                    <button
+                      onClick={downloadBackupZip}
+                      className="w-full bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-400 hover:to-purple-500 px-4 py-3 rounded-lg font-medium transition-all duration-300 flex items-center justify-center space-x-2"
+                    >
+                      <Archive className="h-4 w-4" />
+                      <span>Download ZIP Archive</span>
+                    </button>
+                    
+                    <button
+                      onClick={downloadBackupJson}
+                      className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-400 hover:to-green-500 px-4 py-3 rounded-lg font-medium transition-all duration-300 flex items-center justify-center space-x-2"
+                    >
+                      <Download className="h-4 w-4" />
+                      <span>Download JSON File</span>
+                    </button>
+                    
+                    <button
+                      onClick={copyBackupToClipboard}
+                      className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-400 hover:to-blue-500 px-4 py-3 rounded-lg font-medium transition-all duration-300 flex items-center justify-center space-x-2"
+                    >
+                      <Copy className="h-4 w-4" />
+                      <span>Copy to Clipboard</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Backup Information */}
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 mb-6">
+                  <div className="flex items-start space-x-3">
+                    <Shield className="h-5 w-5 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <div className="text-sm text-blue-400">
+                      <p className="font-medium mb-1">📦 ZIP Archive Contents:</p>
+                      <ul className="space-y-1 text-xs">
+                        <li>• Complete backup data (JSON format)</li>
+                        <li>• Individual folder files for easy access</li>
+                        <li>• README with restoration instructions</li>
+                        <li>• Security notes and warnings</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Backup Summary */}
+                <div className="bg-gray-800/30 rounded-lg p-4 mb-6">
+                  <h4 className="text-sm font-medium text-gray-300 mb-2">Backup Summary:</h4>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-400">Total Folders:</span>
+                      <span className="text-white ml-2">{folders.length}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">Created:</span>
+                      <span className="text-white ml-2">{new Date().toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  onClick={closeBackupModal}
+                  className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white px-4 py-3 rounded-lg transition-all duration-300"
+                >
+                  Close
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Delete Folder Modal */}
+      {showDeleteModal && selectedFolderForDelete && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900/95 border border-red-500/50 rounded-2xl p-8 w-full max-w-md backdrop-blur-sm">
+            <div className="text-center mb-6">
+              <div className="p-3 bg-red-500/10 rounded-full w-fit mx-auto mb-4">
+                <Trash2 className="h-8 w-8 text-red-400" />
+              </div>
+              <h2 className="text-2xl font-bold text-white mb-2">Delete Folder</h2>
+              <p className="text-gray-400">
+                "{selectedFolderForDelete.folder_name}"
+              </p>
+            </div>
+
+            <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 mb-6">
+              <div className="flex items-start space-x-3">
+                <AlertTriangle className="h-5 w-5 text-red-400 mt-0.5 flex-shrink-0" />
+                <div className="text-sm text-red-400">
+                  <p className="font-medium mb-1">⚠️ CRITICAL WARNING:</p>
+                  <ul className="space-y-1 text-xs">
+                    <li>• This action is IRREVERSIBLE</li>
+                    <li>• ALL files and notes will be permanently lost</li>
+                    <li>• No recovery will be possible</li>
+                    <li>• Consider creating a backup first</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Confirm with Encryption Key
+              </label>
+              <div className="relative">
+                <Key className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <input
+                  type="password"
+                  value={deleteKey}
+                  onChange={(e) => setDeleteKey(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 bg-gray-800/50 border border-red-500/50 rounded-lg text-white placeholder-gray-400 focus:border-red-400 focus:ring-1 focus:ring-red-400 transition-colors"
+                  placeholder="Enter folder encryption key to confirm"
+                  onKeyPress={(e) => e.key === 'Enter' && handleDeleteFolder()}
+                />
+              </div>
+            </div>
+
+            <div className="flex space-x-3">
+              <button
+                onClick={closeDeleteModal}
+                className="flex-1 px-4 py-3 bg-gray-700/50 hover:bg-gray-600/50 text-white rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteFolder}
+                disabled={!deleteKey}
+                className="flex-1 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-400 hover:to-red-500 disabled:from-gray-600 disabled:to-gray-700 text-white px-4 py-3 rounded-lg transition-all duration-300 disabled:cursor-not-allowed"
+              >
+                🗑️ DELETE
               </button>
             </div>
           </div>
